@@ -1,0 +1,43 @@
+#!/usr/bin/env ys-0
+
+# usage: ys compress.ys <url>
+# test:  ys compress.ys test
+
+defn main(url):
+  print:
+    if url == 'test':
+      run-tests:
+      compress: url
+
+defn compress(url):
+  response =: http/get(url)
+  body =: response.body
+  type =: response.headers.content-type
+    .replace(/; .*/)
+    .replace(/(application|text)\//)
+  ext =: (url =~ /\.(\w+)$/).1
+
+  cond:
+    type.in?(['js' 'javascript']):
+      body.pipe('uglifyjs')
+    type == 'css':
+      body.pipe('uglifycss')
+    else: body
+
+defn pipe(text cmd):
+  sh({:in text} cmd).out
+
+defn test-compressed(url comped=true):
+  orig =: curl(url)
+  compressed =: compress(url)
+  result =: orig != compressed
+  say:
+    comped.if(result result.!!)
+          .if("PASS" "FAIL")
+
+# Test
+defn run-tests():
+  test-compressed:: https://component-model.bytecodealliance.org/book.js
+  test-compressed:: https://component-model.bytecodealliance.org/highlight.css
+  test-compressed _ false::
+    https://component-model.bytecodealliance.org/tutorial.html
